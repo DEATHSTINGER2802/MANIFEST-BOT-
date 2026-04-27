@@ -181,7 +181,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ embeds: [embed] });
     }
 
-    // ========== /DEPOT COMMAND ==========
+    // /depot command – safe version with reply flag to prevent "already acknowledged" error
     if (interaction.commandName === 'depot') {
         const appid = interaction.options.getInteger('appid');
         await interaction.deferReply();
@@ -191,6 +191,7 @@ client.on('interactionCreate', async interaction => {
         }
 
         const gameDetails = await getGameDetails(appid);
+        let replied = false; // flag to prevent multiple replies
 
         try {
             const response = await axios.post('https://depotbox.org/api/direct-download',
@@ -198,7 +199,7 @@ client.on('interactionCreate', async interaction => {
                 {
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': '55c8fdd8-d9b3-4fbd-9e14-3fc88003086e'  // Replace with your actual DepotBox API key
+                        'X-API-Key': '55c8fdd8-d9b3-4fbd-9e14-3fc88003086e'  // Replace with your actual key
                     },
                     responseType: 'stream',
                     timeout: 30000
@@ -208,6 +209,8 @@ client.on('interactionCreate', async interaction => {
             const chunks = [];
             response.data.on('data', chunk => chunks.push(chunk));
             response.data.on('end', async () => {
+                if (replied) return;
+                replied = true;
                 const buffer = Buffer.concat(chunks);
                 const fileSizeMB = buffer.length / (1024 * 1024);
                 const fileName = `${appid}.zip`;
@@ -215,7 +218,6 @@ client.on('interactionCreate', async interaction => {
                 // Upload to gofile.io
                 const form = new FormData();
                 form.append('file', buffer, { filename: fileName });
-
                 let downloadUrl = null;
                 try {
                     const uploadRes = await axios.post('https://store1.gofile.io/uploadFile', form, {
@@ -236,6 +238,7 @@ client.on('interactionCreate', async interaction => {
                     downloadUrl = null;
                 }
 
+                // Build embed
                 const embed = new EmbedBuilder()
                     .setColor(downloadUrl ? 0x00AAFF : 0xFF0000)
                     .setTitle(`📦 ${gameDetails ? gameDetails.name : `App ID ${appid}`} - DepotBox Source`)
@@ -278,12 +281,16 @@ client.on('interactionCreate', async interaction => {
                 }
             });
 
-            response.data.on('error', (err) => {
+            response.data.on('error', async (err) => {
+                if (replied) return;
+                replied = true;
                 console.error(`Stream error: ${err.message}`);
-                interaction.editReply('❌ Failed to receive the manifest file from DepotBox.');
+                await interaction.editReply('❌ Failed to receive the manifest file from DepotBox.');
             });
 
         } catch (error) {
+            if (replied) return;
+            replied = true;
             console.error(`DepotBox API Error for ${appid}:`, error.message);
             if (error.response) {
                 console.error(`Status: ${error.response.status}`, error.response.data);
