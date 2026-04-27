@@ -1,15 +1,23 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const axios = require('axios');
 const FormData = require('form-data');
+const express = require('express');
 require('dotenv').config();
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// ---------- Express health check server (required for Render) ----------
+const app = express();
+const port = process.env.PORT || 3000;
 
-// ==========================================
-// 🔒 ALLOWED CHANNEL – only commands in this channel will work
-// Replace with your actual channel ID (right-click channel → Copy ID)
-// ==========================================
-const ALLOWED_CHANNEL_ID = '1486248454383599767'; // 👈 CHANGE THIS
+app.get('/', (req, res) => {
+    res.send('✅ Bot is running!');
+});
+
+app.listen(port, () => {
+    console.log(`✅ Health check server listening on port ${port}`);
+});
+// ---------------------------------------------------------------------
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
@@ -91,23 +99,11 @@ async function getGameDetails(appid) {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    // 🧪 Ping command – no channel restriction (optional)
     if (interaction.commandName === 'ping') {
         await interaction.reply('Pong!');
         return;
     }
 
-    // 🔒 Channel restriction for /gen and /depot
-    if (interaction.commandName === 'gen' || interaction.commandName === 'depot') {
-        if (interaction.channelId !== ALLOWED_CHANNEL_ID) {
-            return interaction.reply({
-                content: `❌ This command can only be used in <#${ALLOWED_CHANNEL_ID}>.`,
-                ephemeral: true
-            });
-        }
-    }
-
-    // ========== /GEN COMMAND ==========
     if (interaction.commandName === 'gen') {
         const appid = interaction.options.getInteger('appid');
         await interaction.deferReply();
@@ -197,13 +193,12 @@ client.on('interactionCreate', async interaction => {
         const gameDetails = await getGameDetails(appid);
 
         try {
-            // 1. Download manifest from DepotBox
             const response = await axios.post('https://depotbox.org/api/direct-download',
                 { appid: appid.toString() },
                 {
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': '55c8fdd8-d9b3-4fbd-9e14-3fc88003086e'  // ⚠️ Replace with your actual DepotBox API key (premium = no expiry)
+                        'X-API-Key': '55c8fdd8-d9b3-4fbd-9e14-3fc88003086e'  // Replace with your actual DepotBox API key
                     },
                     responseType: 'stream',
                     timeout: 30000
@@ -217,7 +212,7 @@ client.on('interactionCreate', async interaction => {
                 const fileSizeMB = buffer.length / (1024 * 1024);
                 const fileName = `${appid}.zip`;
 
-                // 2. Upload to gofile.io (permanent file host)
+                // Upload to gofile.io
                 const form = new FormData();
                 form.append('file', buffer, { filename: fileName });
 
@@ -241,7 +236,6 @@ client.on('interactionCreate', async interaction => {
                     downloadUrl = null;
                 }
 
-                // 3. Build embed
                 const embed = new EmbedBuilder()
                     .setColor(downloadUrl ? 0x00AAFF : 0xFF0000)
                     .setTitle(`📦 ${gameDetails ? gameDetails.name : `App ID ${appid}`} - DepotBox Source`)
