@@ -4,14 +4,24 @@ const FormData = require('form-data');
 const express = require('express');
 require('dotenv').config();
 
-// ---------- Express server (health check + debug) ----------
+// ---------- Express server (health check + diagnostic endpoints) ----------
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Health check endpoint (required by Render)
 app.get('/', (req, res) => res.send('✅ Bot is running!'));
 
-// Debug endpoint – shows if DISCORD_TOKEN is set (without exposing full token)
+// Diagnostic endpoint: test if Render can reach Discord's API
+app.get('/test-discord', async (req, res) => {
+    try {
+        const result = await axios.get('https://discord.com/api/v9/gateway', { timeout: 5000 });
+        res.json({ success: true, data: result.data });
+    } catch (err) {
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Debug endpoint: check if DISCORD_TOKEN environment variable is set
 app.get('/debug', (req, res) => {
     const tokenExists = !!process.env.DISCORD_TOKEN;
     res.json({
@@ -194,7 +204,10 @@ client.on('interactionCreate', async interaction => {
 
 // Log token existence and attempt login with error catcher
 console.log('🔍 Token exists?', !!process.env.DISCORD_TOKEN);
-client.login(process.env.DISCORD_TOKEN).catch(err => {
-    console.error('❌ Login failed:', err);
-    process.exit(1);
-});
+console.log('🚀 Attempting to login...');
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => console.log('✅ Login promise resolved'))
+    .catch(err => {
+        console.error('❌ Login failed:', err);
+        process.exit(1);
+    });
