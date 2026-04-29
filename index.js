@@ -178,7 +178,8 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Login with error catcher so Render logs show the real problem
+// Log token existence and attempt login with error catcher
+console.log('🔍 Token exists?', !!process.env.DISCORD_TOKEN);
 client.login(process.env.DISCORD_TOKEN).catch(err => {
     console.error('❌ Login failed:', err);
     process.exit(1);
