@@ -4,24 +4,14 @@ const FormData = require('form-data');
 const express = require('express');
 require('dotenv').config();
 
-// ---------- Express server (health check + diagnostic endpoints) ----------
+// ---------- Express server (health check + debug only) ----------
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Health check endpoint (required by Render)
 app.get('/', (req, res) => res.send('✅ Bot is running!'));
 
-// Diagnostic endpoint: test if Render can reach Discord's API
-app.get('/test-discord', async (req, res) => {
-    try {
-        const result = await axios.get('https://discord.com/api/v9/gateway', { timeout: 5000 });
-        res.json({ success: true, data: result.data });
-    } catch (err) {
-        res.json({ success: false, error: err.message });
-    }
-});
-
-// Debug endpoint: check if DISCORD_TOKEN environment variable is set
+// Debug endpoint – only checks if DISCORD_TOKEN is set (no API call)
 app.get('/debug', (req, res) => {
     const tokenExists = !!process.env.DISCORD_TOKEN;
     res.json({
@@ -202,9 +192,8 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Log token existence and attempt login with error catcher
+// Log token existence and attempt login
 console.log('🔍 Token exists?', !!process.env.DISCORD_TOKEN);
-console.log('🚀 Attempting to login...');
 client.login(process.env.DISCORD_TOKEN)
     .then(() => console.log('✅ Login promise resolved'))
     .catch(err => {
