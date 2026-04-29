@@ -4,10 +4,24 @@ const FormData = require('form-data');
 const express = require('express');
 require('dotenv').config();
 
-// ---------- Express health check (required by Render) ----------
+// ---------- Express server (health check + debug) ----------
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Health check endpoint (required by Render)
 app.get('/', (req, res) => res.send('✅ Bot is running!'));
+
+// Debug endpoint – shows if DISCORD_TOKEN is set (without exposing full token)
+app.get('/debug', (req, res) => {
+    const tokenExists = !!process.env.DISCORD_TOKEN;
+    res.json({
+        tokenExists,
+        tokenPreview: tokenExists ? process.env.DISCORD_TOKEN.slice(0, 10) + '...' : 'not set',
+        nodeVersion: process.version,
+        timestamp: new Date().toISOString()
+    });
+});
+
 app.listen(port, () => console.log(`✅ Health check listening on port ${port}`));
 // ----------------------------------------------------------------
 
